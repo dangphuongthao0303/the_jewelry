@@ -14,7 +14,7 @@
         <div class="logo"><a href="#">Wish</a></div>
         <nav class="main_nav">
             <ul>
-                <li><a href="#">home</a></li>
+                <li><a href="index.jsp">home</a></li>
                 <% for (Category category : categories) { %>
                         <li><a href="categories.jsp?category=<%= category.getCategoryId() %>">
                             <%= category.getCategoryName() %>

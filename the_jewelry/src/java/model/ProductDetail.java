@@ -8,7 +8,7 @@ package model;
  *
  * @author ASUS
  */
-public class PorductDetail {
+public class ProductDetail {
     private int id;
     private int productID;
     private String size;
@@ -16,7 +16,7 @@ public class PorductDetail {
     private Integer price;
     private String image;
 
-    public PorductDetail(int id, int productID, String size, String color, Integer price, String image) {
+    public ProductDetail(int id, int productID, String size, String color, Integer price, String image) {
         this.id = id;
         this.productID = productID;
         this.size = size;
