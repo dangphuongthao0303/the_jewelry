@@ -1,7 +1,3 @@
-/*
- * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
- * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
- */
 package repository;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -31,6 +27,22 @@ public class ProductRepository {
         }
     }
 
+    public List<Product> findByCategory(int page, int pageSize, Map<String, String> filters, String sortBy, String sortOrder) {
+        validateFilters(filters);
+        validateSort(sortBy);
+
+        String sql = buildCategoryQuery(filters, sortBy, sortOrder);
+        List<Object> params = buildParams(filters, page, pageSize);
+
+        try ( Connection conn = DBContext.getConnection();  PreparedStatement stmt = conn.prepareStatement(sql)) {
+            setParameters(stmt, params);
+            ResultSet rs = stmt.executeQuery();
+            return mapProducts(rs);
+        } catch (SQLException e) {
+            throw new RuntimeException("Database error", e);
+        }
+    }
+
     public int countAll(Map<String, String> filters) {
         validateFilters(filters);
 
@@ -46,10 +58,49 @@ public class ProductRepository {
         }
     }
 
+    public int countByCategory(int categoryId, Map<String, String> filters) {
+        validateFilters(filters);
+
+        String sql = "SELECT COUNT(DISTINCT p.ProductID) FROM Products p "
+                + "INNER JOIN ProductDetail pd ON p.ProductID = pd.ProductID "
+                + "WHERE p.ProductStatus = 1 AND p.CategoryID = ? ";
+
+        StringBuilder sqlBuilder = new StringBuilder(sql);
+        appendFilters(sqlBuilder, filters);
+        List<Object> params = new ArrayList<>();
+        params.add(categoryId);
+        params.addAll(filters.values());
+
+        try ( Connection conn = DBContext.getConnection();  PreparedStatement stmt = conn.prepareStatement(sqlBuilder.toString())) {
+            setParameters(stmt, params);
+            ResultSet rs = stmt.executeQuery();
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) {
+            throw new RuntimeException("Database error", e);
+        }
+    }
+
     private String buildQuery(Map<String, String> filters, String sortBy, String sortOrder) {
         StringBuilder sql = new StringBuilder("SELECT p.ProductID, p.ProductName, p.CategoryID, p.Quantity, p.SoldQuantity, p.Date, p.Description, p.ProductStatus ")
                 .append("FROM Products p INNER JOIN ProductDetail pd ON p.ProductID = pd.ProductID ")
                 .append("WHERE p.ProductStatus = 1 ");
+
+        appendFilters(sql, filters);
+        sql.append(" GROUP BY p.ProductID, p.ProductName, p.CategoryID, p.Quantity, p.SoldQuantity, p.Date, p.Description, p.ProductStatus ");
+
+        if (sortBy != null) {
+            sql.append("ORDER BY ").append(sortOrder.equalsIgnoreCase("DESC") ? "MAX" : "MIN")
+                    .append("(pd.").append(sortBy).append(") ").append(sortOrder).append(" ");
+        }
+
+        sql.append("OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
+        return sql.toString();
+    }
+
+    private String buildCategoryQuery(Map<String, String> filters, String sortBy, String sortOrder) {
+        StringBuilder sql = new StringBuilder("SELECT p.ProductID, p.ProductName, p.CategoryID, p.Quantity, p.SoldQuantity, p.Date, p.Description, p.ProductStatus "
+                + "FROM Products p INNER JOIN ProductDetail pd ON p.ProductID = pd.ProductID "
+                + "WHERE p.ProductStatus = 1 AND p.CategoryID = ? ");
 
         appendFilters(sql, filters);
         sql.append(" GROUP BY p.ProductID, p.ProductName, p.CategoryID, p.Quantity, p.SoldQuantity, p.Date, p.Description, p.ProductStatus ");

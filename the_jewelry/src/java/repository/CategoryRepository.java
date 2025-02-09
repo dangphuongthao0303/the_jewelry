@@ -9,7 +9,7 @@ import java.util.List;
 import model.Category;
 
 public class CategoryRepository {
-    private static final String GET_ALL_CATEGORIES_SQL = "SELECT categoryId, categoryName, categoryStatus FROM Category";
+    private static final String GET_ALL_CATEGORIES_SQL = "SELECT categoryId, categoryName, categoryStatus FROM Categories";
 
     public List<Category> getAllCategories() {
         List<Category> categories = new ArrayList<>();
