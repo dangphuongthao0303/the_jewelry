@@ -1,29 +1,80 @@
 <%@page import="java.util.List"%>
 <%@page import="java.util.Map"%>
+<%@page import="java.util.HashMap"%>
 <%@page import="service.ProductService"%>
 <%@page import="model.ProductResponse"%>
 <%@page import="repository.ProductRepository"%>
 <%@page import="model.PaginatedResponse"%>
+<%@page import="java.text.DecimalFormat"%>
+<%@page import="java.text.DecimalFormatSymbols"%>
 
 <%
     // Retrieve categoryId from request, default to 1 if not provided
     String categoryIdParam = request.getParameter("category");
-    int categoryId = (categoryIdParam != null) ? Integer.parseInt(categoryIdParam) : 1;
+    int categoryId = 1; // Default category ID
 
-    // Handle optional parameters
+    if (categoryIdParam != null && !categoryIdParam.isEmpty()) {
+        try {
+            categoryId = Integer.parseInt(categoryIdParam);
+        } catch (NumberFormatException e) {
+            categoryId = 1; // Fallback to default if parsing fails
+        }
+    }
+
+    // Retrieve optional filters
+    String size = request.getParameter("size");
+    String minPriceParam = request.getParameter("minPrice");
+    String maxPriceParam = request.getParameter("maxPrice");
+
+    Map<String, String> filters = ProductRepository.extractFilters(request); // Extract filters from request
+
+    // Add additional filters manually
+    if (size != null && !size.isEmpty()) {
+        filters.put("Size", size);
+    }
+    if (minPriceParam != null && !minPriceParam.isEmpty()) {
+        filters.put("minPrice", minPriceParam);
+    }
+    if (maxPriceParam != null && !maxPriceParam.isEmpty()) {
+        filters.put("maxPrice", maxPriceParam);
+    }
+
+    // Handle pagination parameters
     String pageParam = request.getParameter("page");
-    int currentPage = (pageParam != null && !pageParam.isEmpty()) ? Integer.parseInt(pageParam) : 1; // Renamed `page` to `currentPage`
+    int currentPage = 1; // Default to first page
     int pageSize = 10; // Default page size
 
-    // Sorting and filtering
-    String sortBy = request.getParameter("sortBy") != null ? request.getParameter("sortBy") : "Price"; // Default sort by Price
-    String sortOrder = request.getParameter("sortOrder") != null ? request.getParameter("sortOrder") : "ASC"; // Default ascending order
-    Map<String, String> filters = ProductRepository.extractFilters(request); // Extract filters from request
+    if (pageParam != null && !pageParam.isEmpty()) {
+        try {
+            currentPage = Integer.parseInt(pageParam);
+        } catch (NumberFormatException e) {
+            currentPage = 1; // Fallback to default if parsing fails
+        }
+    }
+
+    // Sorting parameters
+    String sortBy = request.getParameter("sortBy");
+    if (sortBy == null || sortBy.isEmpty()) {
+        sortBy = "Price"; // Default sort by Price
+    }
+
+    String sortOrder = request.getParameter("sortOrder");
+    if (sortOrder == null || sortOrder.isEmpty()) {
+        sortOrder = "ASC"; // Default to ascending order
+    }
 
     // Call service to get product list
     ProductService productService = new ProductService();
-    PaginatedResponse<ProductResponse> productResponse = productService.listProductsByCategory(categoryId, currentPage, pageSize, filters, sortBy, sortOrder); // Renamed `response` to `productResponse`
+    PaginatedResponse<ProductResponse> productResponse = productService.listProductsByCategory(
+        categoryId, currentPage, pageSize, filters, sortBy, sortOrder
+    );
+
     List<ProductResponse> products = productResponse.getData();
+
+    // Create a DecimalFormat to display price with dot as grouping separator.
+    DecimalFormatSymbols symbols = new DecimalFormatSymbols();
+    symbols.setGroupingSeparator('.');
+    DecimalFormat formatter = new DecimalFormat("#,###", symbols);
 %>
 
 <!-- Product Grid -->
@@ -40,9 +91,10 @@
         <div class="product_content clearfix">
             <div class="product_info">
                 <div class="product_name">
-                    <a href="productDetail.jsp?productId=<%= product.getProductId() %>"><%= product.getProductName() %> <%= product.getProductId() %></a>
+                    <a href="productDetail.jsp?productId=<%= product.getProductId() %>"><%= product.getProductName() %></a>
                 </div>
-                <div class="product_price"><%= product.getProductPrice() %> VND</div>
+                <!-- Format the price using the formatter -->
+                <div class="product_price"><%= formatter.format(product.getProductPrice()) %> VND</div>
                 <div class="product_details">
                     <span>Size: <%= product.getProductSize() %></span> |
                     <span>Color: <%= product.getProductColor() %></span>

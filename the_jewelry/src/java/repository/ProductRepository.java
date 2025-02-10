@@ -7,8 +7,9 @@ import model.ProductResponse;
 
 public class ProductRepository {
 
-    private static final List<String> ALLOWED_FILTERS = Arrays.asList("Color", "Size", "Price");
-    private static final List<String> ALLOWED_SORT = Arrays.asList("Price", "Size", "Color");
+    // Include "original-order" as an allowed sort option.
+    private static final List<String> ALLOWED_SORT = Arrays.asList("Price", "Size", "Color", "original-order");
+    private static final List<String> ALLOWED_FILTERS = Arrays.asList("Color", "Size", "minPrice", "maxPrice");
 
     private static final String BASE_QUERY = "SELECT p.ProductID, p.ProductName, pd.Price, pd.Size, pd.Color, pd.Image "
             + "FROM ProductDetail pd "
@@ -19,10 +20,20 @@ public class ProductRepository {
             + "INNER JOIN Products p ON pd.ProductID = p.ProductID "
             + "WHERE p.ProductStatus = 1 AND p.CategoryID = ?";
 
-    public List<ProductResponse> findByCategory(int categoryId, int page, int pageSize, Map<String, String> filters, String sortBy, String sortOrder) {
-        System.out.println("===========================");
-        System.out.println("category id " +  categoryId);
-        System.out.println("===========================");
+    /**
+     * Finds products by category applying pagination, filters, and sorting.
+     *
+     * @param categoryId the category ID
+     * @param page the page number (1-based)
+     * @param pageSize the number of items per page
+     * @param filters the map of filters (including "Color", "Size", "minPrice",
+     * and "maxPrice")
+     * @param sortBy the column to sort by (if any)
+     * @param sortOrder the sort order (e.g., ASC or DESC)
+     * @return a list of ProductResponse objects
+     */
+    public List<ProductResponse> findByCategory(int categoryId, int page, int pageSize,
+            Map<String, String> filters, String sortBy, String sortOrder) {
         validateFilters(filters);
         validateSort(sortBy);
 
@@ -54,6 +65,13 @@ public class ProductRepository {
         return productResponses;
     }
 
+    /**
+     * Extracts filters from the HTTP request. It looks for parameters named
+     * "Color", "Size", "minPrice", and "maxPrice" (if provided).
+     *
+     * @param request the HTTP request
+     * @return a map of filter names and values
+     */
     public static Map<String, String> extractFilters(HttpServletRequest request) {
         Map<String, String> filters = new HashMap<>();
         for (String filter : ALLOWED_FILTERS) {
@@ -69,23 +87,39 @@ public class ProductRepository {
         StringBuilder sql = new StringBuilder(BASE_QUERY);
         appendFilters(sql, filters);
 
+        // Only append ORDER BY clause if sortBy is not null and is not "original-order"
         if (sortBy != null) {
-            sql.append(" ORDER BY pd.").append(sortBy).append(" ").append(sortOrder);
+            if ("Size".equals(sortBy)) {
+                // Remove the 'ml' suffix and cast to int for numeric sorting
+                sql.append(" ORDER BY CAST(REPLACE(pd.Size, 'ml', '') AS INT) ").append(sortOrder);
+            } else {
+                sql.append(" ORDER BY pd.").append(sortBy).append(" ").append(sortOrder);
+            }
         }
-
         sql.append(" OFFSET ? ROWS FETCH NEXT ? ROWS ONLY");
         return sql.toString();
     }
 
+    /**
+     * Appends the filter conditions to the SQL query. For "minPrice" and
+     * "maxPrice", we use range operators.
+     */
     private void appendFilters(StringBuilder sql, Map<String, String> filters) {
-        if (!filters.isEmpty()) {
-            sql.append(" AND ");
-            Iterator<Map.Entry<String, String>> iterator = filters.entrySet().iterator();
-            while (iterator.hasNext()) {
-                Map.Entry<String, String> entry = iterator.next();
-                sql.append("pd.").append(entry.getKey()).append(" = ?");
-                if (iterator.hasNext()) {
+        boolean firstCondition = true;
+        for (String key : ALLOWED_FILTERS) {
+            if (filters.containsKey(key)) {
+                if (firstCondition) {
                     sql.append(" AND ");
+                    firstCondition = false;
+                } else {
+                    sql.append(" AND ");
+                }
+                if ("minPrice".equals(key)) {
+                    sql.append("pd.Price >= ?");
+                } else if ("maxPrice".equals(key)) {
+                    sql.append("pd.Price <= ?");
+                } else {
+                    sql.append("pd.").append(key).append(" = ?");
                 }
             }
         }
@@ -99,7 +133,15 @@ public class ProductRepository {
 
             List<Object> params = new ArrayList<>();
             params.add(categoryId);
-            params.addAll(filters.values());
+            for (String key : ALLOWED_FILTERS) {
+                if (filters.containsKey(key)) {
+                    if ("minPrice".equals(key) || "maxPrice".equals(key)) {
+                        params.add(Integer.valueOf(filters.get(key)));
+                    } else {
+                        params.add(filters.get(key));
+                    }
+                }
+            }
 
             setParameters(stmt, params);
 
@@ -113,10 +155,22 @@ public class ProductRepository {
         return 0;
     }
 
+    /**
+     * Builds the parameters for the prepared statement in the same order as
+     * they are used in the SQL.
+     */
     private List<Object> buildParams(int categoryId, Map<String, String> filters, int page, int pageSize) {
         List<Object> params = new ArrayList<>();
         params.add(categoryId);
-        params.addAll(filters.values());
+        for (String key : ALLOWED_FILTERS) {
+            if (filters.containsKey(key)) {
+                if ("minPrice".equals(key) || "maxPrice".equals(key)) {
+                    params.add(Integer.valueOf(filters.get(key)));
+                } else {
+                    params.add(filters.get(key));
+                }
+            }
+        }
         params.add((page - 1) * pageSize);
         params.add(pageSize);
         return params;
