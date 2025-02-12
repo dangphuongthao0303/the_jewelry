@@ -38,11 +38,11 @@
     if (maxPriceParam != null && !maxPriceParam.isEmpty()) {
         filters.put("maxPrice", maxPriceParam);
     }
-
+    
     // Handle pagination parameters
     String pageParam = request.getParameter("page");
     int currentPage = 1; // Default to first page
-    int pageSize = 10; // Default page size
+    int pageSize = 12; // Default page size
 
     if (pageParam != null && !pageParam.isEmpty()) {
         try {
@@ -52,12 +52,21 @@
         }
     }
 
+    // Retrieve pageSize from request parameters
+    String pageSizeParam = request.getParameter("pageSize");
+    if (pageSizeParam != null && !pageSizeParam.isEmpty()) {
+        try {
+            pageSize = Integer.parseInt(pageSizeParam);
+        } catch (NumberFormatException e) {
+            pageSize = 12; // Fallback to default
+        }
+    }
     // Sorting parameters
     String sortBy = request.getParameter("sortBy");
     if (sortBy == null || sortBy.isEmpty()) {
         sortBy = "Price"; // Default sort by Price
     }
-
+    
     String sortOrder = request.getParameter("sortOrder");
     if (sortOrder == null || sortOrder.isEmpty()) {
         sortOrder = "ASC"; // Default to ascending order

@@ -55,6 +55,7 @@
                                         <ul id="size-filter">
                                             <li><a href="#" data-size="30ml">Small S (30ML)</a></li>
                                             <li><a href="#" data-size="50ml">Medium M (50ML)</a></li>
+                                            <li><a href="#" data-size="75ml">Medium M (75ML)</a></li>
                                             <li><a href="#" data-size="100ml">Large L (100ML)</a></li>
                                         </ul>
                                     </div>
@@ -83,30 +84,7 @@
                                     <div class="view_box box_view"><i class="fa fa-th-large" aria-hidden="true"></i></div>
                                     <div class="view_box detail_view"><i class="fa fa-bars" aria-hidden="true"></i></div>
                                 </div>
-                                <div class="sorting">
-                                    <ul class="item_sorting">
-                                        <li>
-                                            <span class="sorting_text">Sort by</span>
-                                            <i class="fa fa-caret-down" aria-hidden="true"></i>
-                                            <ul>
-                                                <!-- Updated sorting options -->
-                                                <li class="product_sorting_btn" data-isotope-option='{"sortBy": "original-order"}'><span>Default</span></li>
-                                                <li class="product_sorting_btn" data-isotope-option='{"sortBy": "Price"}'><span>Price</span></li>
-                                                <li class="product_sorting_btn" data-isotope-option='{"sortBy": "Size"}'><span>Size</span></li>
-                                            </ul>
-                                        </li>
-                                        <li>
-                                            <span class="sorting_text">Show</span>
-                                            <span class="num_sorting_text">12</span>
-                                            <i class="fa fa-caret-down" aria-hidden="true"></i>
-                                            <ul>
-                                                <li class="num_sorting_btn"><span>3</span></li>
-                                                <li class="num_sorting_btn"><span>6</span></li>
-                                                <li class="num_sorting_btn"><span>12</span></li>
-                                            </ul>
-                                        </li>
-                                    </ul>
-                                </div>
+
                             </div>
                         </div>
                     </div>
@@ -116,14 +94,63 @@
                             <%@ include file="listProduct.jsp" %>
                         </div>
                     </div>
+                    <div class="sorting">
+                        <ul class="item_sorting">
+                            <li>
+                                <span class="sorting_text">Sort by</span>
+                                <i class="fa fa-caret-down" aria-hidden="true"></i>
+                                <ul>
+                                    <!-- Updated sorting options -->
+                                    <li class="product_sorting_btn" data-isotope-option='{"sortBy": "original-order"}'><span>Default</span></li>
+                                    <li class="product_sorting_btn" data-isotope-option='{"sortBy": "Price"}'><span>Price</span></li>
+                                    <li class="product_sorting_btn" data-isotope-option='{"sortBy": "Size"}'><span>Size</span></li>
+                                </ul>
+                            </li>
+                            <li>
+                                <span class="sorting_text">Show</span>
+                                <span class="num_sorting_text"><%= pageSize %></span>
+                                <i class="fa fa-caret-down" aria-hidden="true"></i>
+                                <ul>
+                                    <li class="num_sorting_btn"><span>3</span></li>
+                                    <li class="num_sorting_btn"><span>6</span></li>
+                                    <li class="num_sorting_btn"><span>12</span></li>
+                                </ul>
+                            </li>
+                        </ul>
+                    </div>
+                    <%
+                        // Generate pagination links based on total pages
+                        int totalPages = productResponse.getTotalPages();
+
+                        // Build base query string (excluding the "page" parameter) to preserve filters, sorting, etc.
+                        StringBuilder baseQuery = new StringBuilder();
+                        java.util.Enumeration<String> parameterNames = request.getParameterNames();
+                        while (parameterNames.hasMoreElements()) {
+                            String paramName = parameterNames.nextElement();
+                            if (!"page".equals(paramName)) {
+                                String[] values = request.getParameterValues(paramName);
+                                for (String value : values) {
+                                    if (baseQuery.length() > 0) {
+                                        baseQuery.append("&");
+                                    }
+                                    baseQuery.append(paramName).append("=").append(value);
+                                }
+                            }
+                        }
+                        String baseQueryString = baseQuery.toString();
+                    %>
+
+                    <!-- Pagination -->
                     <div class="row page_num_container">
                         <div class="col text-right">
                             <ul class="page_nums">
-                                <li><a href="#">01</a></li>
-                                <li class="active"><a href="#">02</a></li>
-                                <li><a href="#">03</a></li>
-                                <li><a href="#">04</a></li>
-                                <li><a href="#">05</a></li>
+                                <% for (int i = 1; i <= totalPages; i++) { %>
+                                <li class="<%= (i == currentPage) ? "active" : "" %>">
+                                    <a href="categories.jsp?<%= (baseQueryString != null && !baseQueryString.isEmpty()) ? "&" + baseQueryString : "" %>&page=<%= i %>">
+                                        <%= (i < 10 ? "0" + i : i) %>
+                                    </a>
+                                </li>
+                                <% } %>
                             </ul>
                         </div>
                     </div>
@@ -237,7 +264,11 @@
                                             var selectedSize = $(this).data('size');
                                             applyFilters({size: selectedSize});
                                         });
-
+                                        $('.num_sorting_btn').on('click', function (e) {
+                                            e.preventDefault();
+                                            var selectedPageSize = $(this).find('span').text();
+                                            applyFilters({pageSize: selectedPageSize});
+                                        });
                                         // --- Price Filter: Apply Button ---
                                         $('#applyPriceBtn').on('click', function (e) {
                                             e.preventDefault();
@@ -288,7 +319,12 @@
                                             params.delete('minPrice');
                                             params.delete('maxPrice');
                                         }
-
+                                        if (filters.pageSize) {
+                                            params.set('pageSize', filters.pageSize);
+                                            params.delete('page'); // Reset to first page
+                                        } else {
+                                            params.delete('pageSize');
+                                        }
                                         // Update the sorting parameter
                                         if (filters.sortBy) {
                                             params.set('sortBy', filters.sortBy);
